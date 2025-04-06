@@ -1,0 +1,6 @@
+Transformer:
+    test accuracy using torchtext = 72.93
+    test accuracy using basic tokenizer = 70.75
+
+CLSTM:
+   

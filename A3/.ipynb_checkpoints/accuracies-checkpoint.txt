@@ -1,0 +1,3 @@
+Transformer:
+test accuracy using torchtext = 71.29
+test accuracy using basic tokenizer = 74.97
