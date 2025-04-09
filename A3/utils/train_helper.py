@@ -83,3 +83,16 @@ def test_model(model, test_loader, device):
             test_total += inputs.size(0)
     test_acc = test_corrects / test_total
     print(f"Test Accuracy: {test_acc:.4f}")
+
+def evaluate_model(model, test_loader, device):
+    model.eval()
+    all_preds = []
+    all_labels = []
+    with torch.no_grad():
+        for inputs, labels in tqdm(test_loader, desc="Evaluating"):
+            inputs = inputs.to(device)
+            outputs = model(inputs)
+            preds = torch.argmax(outputs, dim=1).cpu().numpy()
+            all_preds.extend(preds)
+            all_labels.extend(labels.numpy())
+    return all_preds, all_labels

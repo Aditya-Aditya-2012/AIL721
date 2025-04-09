@@ -10,6 +10,8 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from tqdm import tqdm
+from sklearn.metrics import f1_score
+
 try:
     import torchtext
     from torchtext.data.utils import get_tokenizer
@@ -25,7 +27,7 @@ from models.encoder_arch import TextClassificationModel
 from models.dataset import TextClassificationDataset, build_vocab
 from models.init_seed import initialize
 from utils.preprocessing import make_train_data, make_test_data, train_val_split
-from utils.train_helper import train_model, test_model
+from utils.train_helper import train_model, test_model, evaluate_model
 from utils.make_plots import make_plot
 
 
@@ -39,7 +41,7 @@ def main():
     parser.add_argument("--num_layers", type=int, default=2,
                         help="Number of encoder layers (used for transformer).")
     parser.add_argument("--embed_dim", type=int, default=256, help="Embedding dimension.")
-    parser.add_argument("--num_heads", type=int, default=8, help="Number of heads (for transformer).")
+    parser.add_argument("--num_heads", type=int, default=64, help="Number of heads (for transformer).")
     parser.add_argument("--dense_dim", type=int, default=32, help="Dense dimension in transformer.")
     # CLSTM parameters
     parser.add_argument("--num_filters", type=int, default=100, help="Number of filters for each convolution in CLSTM.")
@@ -164,6 +166,9 @@ def main():
     
     model.load_state_dict(torch.load(save_model_path, map_location=device))
     test_model(model, test_loader, device)
+    preds, labels = evaluate_model(model, test_loader, device)
+    micro_f1 = f1_score(labels, preds, average="micro")
+    print("Micro-average F1 score on test set: {:.4f}".format(micro_f1))
     
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)

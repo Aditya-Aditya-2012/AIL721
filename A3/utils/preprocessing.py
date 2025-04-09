@@ -6,10 +6,6 @@ import pandas as pd
 
 
 def make_train_data(dir_name="Datasets", file_name="TrainData.csv"):
-    """
-    Reads a CSV file and creates text files in category folders under `dir_name/train`.
-    The CSV is expected to have columns "Category" and "Text".
-    """
     csv_path = os.path.join(dir_name, file_name)
     data = pd.read_csv(csv_path)
 
@@ -33,10 +29,6 @@ def make_train_data(dir_name="Datasets", file_name="TrainData.csv"):
 
 
 def make_test_data(dir_name="Datasets", file_name="TestLabels.csv"):
-    """
-    Reads a CSV file and creates text files in category folders under `dir_name/test`.
-    The CSV is expected to have columns "Label - (business, tech, politics, sport, entertainment)" and "Text".
-    """
     csv_path = os.path.join(dir_name, file_name)
     data = pd.read_csv(csv_path)
 
@@ -60,10 +52,6 @@ def make_test_data(dir_name="Datasets", file_name="TestLabels.csv"):
 
 
 def train_val_split(dir_name="Datasets", split_ratio=0.2):
-    """
-    Splits data from `dir_name/train` into training and validation sets.
-    Moves a fraction (defined by split_ratio) of files from each category in train to `dir_name/val`.
-    """
     base_dir = pathlib.Path(dir_name)
     val_dir = base_dir / "val"
     train_dir = base_dir / "train"
@@ -79,11 +67,7 @@ def train_val_split(dir_name="Datasets", split_ratio=0.2):
 
     print("Created validation data.")
 
-
-# Optional: allow the module to be run directly for testing purposes.
 if __name__ == "__main__":
-    # Example usage: create training data, test data and perform train/val split.
-    # Adjust the CSV file names if necessary.
     make_train_data(dir_name="Datasets", file_name="TrainData.csv")
     make_test_data(dir_name="Datasets", file_name="TestLabels.csv")
     train_val_split(dir_name="Datasets", split_ratio=0.2)
