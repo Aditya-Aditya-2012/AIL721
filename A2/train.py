@@ -12,6 +12,7 @@ from models.resnet import resnet
 from utility.step_lr import StepLR
 from utility.bypass_bn import enable_running_stats, disable_running_stats
 from utility.initialize import initialize
+from make_plot import *
 
 initialize(seed=0)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -64,12 +65,19 @@ def evaluate_model(model, data_loader):
     accuracy = 100.0 * correct / total
     return avg_loss, accuracy
 
-def train_model(model, train_loader, val_loader, save_weights_path, epoch_cap):
+def train_model(model, train_loader, val_loader, save_weights_path, epoch_cap, optimizer_name):
     model = model.float().to(device)
-    base_optimizer = torch.optim.SGD
-    optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, adaptive=True,
-                    momentum=0.9, lr=0.05, weight_decay=0.0005)
-    scheduler = StepLR(optimizer, 0.05, epoch_cap)
+
+    if optimizer_name == 'SAM':
+        base_optimizer = torch.optim.SGD
+        optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, adaptive=True,
+                        momentum=0.9, lr=0.05, weight_decay=0.0005)
+        scheduler = StepLR(optimizer, 0.05, epoch_cap)
+    elif optimizer_name == 'ADAM':
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0005)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
+    else:
+        raise ValueError("Unsupported optimizer. Choose 'SAM' or 'ADAM'.")
 
     train_accuracies = []
     val_accuracies = []
@@ -77,8 +85,8 @@ def train_model(model, train_loader, val_loader, save_weights_path, epoch_cap):
     start_time = time.time()
 
     best_val_accuracy = 0
-
     epoch = 0
+
     while time.time() - start_time < training_duration and epoch < epoch_cap:
         epoch += 1
         model.train()
@@ -90,24 +98,29 @@ def train_model(model, train_loader, val_loader, save_weights_path, epoch_cap):
             inputs = inputs.float().to(device)
             labels = labels.long().to(device)
 
-            # First forward-backward step
-            enable_running_stats(model)
-            predictions = model(inputs)
-            loss = smooth_crossentropy(predictions, labels)
-            loss.mean().backward()
-            optimizer.first_step(zero_grad=True)
+            if optimizer_name == 'SAM':
+                enable_running_stats(model)
+                predictions = model(inputs)
+                loss = smooth_crossentropy(predictions, labels)
+                loss.mean().backward()
+                optimizer.first_step(zero_grad=True)
 
-            # Second forward-backward step
-            disable_running_stats(model)
-            smooth_crossentropy(model(inputs), labels).mean().backward()
-            optimizer.second_step(zero_grad=True)
+                disable_running_stats(model)
+                smooth_crossentropy(model(inputs), labels).mean().backward()
+                optimizer.second_step(zero_grad=True)
+            else:  # ADAM
+                predictions = model(inputs)
+                loss = smooth_crossentropy(predictions, labels)
+                optimizer.zero_grad()
+                loss.mean().backward()
+                optimizer.step()
 
             running_loss += loss.mean().item()
             _, predicted = torch.max(predictions.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-        scheduler(epoch)
+        scheduler.step()
 
         val_loss, val_accuracy = evaluate_model(model, val_loader)
         train_accuracy = 100 * correct / total
@@ -117,6 +130,8 @@ def train_model(model, train_loader, val_loader, save_weights_path, epoch_cap):
         epoch_loss = running_loss / len(train_loader)
         elapsed_time = time.time() - start_time
         
+        make_plots(train_accuracies, val_accuracies, 'train_plot_ADAM')
+
         print(f"Epoch {epoch}, Time: {elapsed_time:.2f}s, Train Loss: {epoch_loss:.4f}, " 
               f"Val Loss: {val_loss:.4f}, Train Accuracy: {train_accuracy:.2f}%, " 
               f"Val Accuracy: {val_accuracy:.2f}%")
@@ -129,12 +144,14 @@ def train_model(model, train_loader, val_loader, save_weights_path, epoch_cap):
     return model, best_val_accuracy
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python train.py <train data dir> <weight checkpoint dir>")
+    if len(sys.argv) != 4:
+        print("Usage: python train.py <train data dir> <weight checkpoint dir> <optimizer: SAM|ADAM>")
         sys.exit(1)
-    
+
     train_dir = sys.argv[1]
     weight_ckpt_dir = sys.argv[2]
+    optimizer_name = sys.argv[3].upper()
+    
     os.makedirs(weight_ckpt_dir, exist_ok=True)
     save_weights_path = os.path.join(weight_ckpt_dir, "resnet_model.pth")
 
@@ -145,10 +162,9 @@ def main():
     model = resnet(n, num_classes)
     
     epoch_cap = 100
-    model, best_val_accuracy = train_model(model, train_loader, val_loader, save_weights_path, epoch_cap)
+    model, best_val_accuracy = train_model(model, train_loader, val_loader, save_weights_path, epoch_cap, optimizer_name)
 
     print(f"Training complete. Best validation accuracy: {best_val_accuracy:.2f}%")
-
 
 if __name__ == '__main__':
     main()
